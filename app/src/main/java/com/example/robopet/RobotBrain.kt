@@ -25,7 +25,8 @@ data class RobotState(
     val recognizedText: String? = null,
     val speechModeNotice: String? = null,
     val speechError: String? = null,
-    val audioLevel: Float = 0f
+    val audioLevel: Float = 0f,
+    val currentExpression: FaceExpression = FaceExpression.NEUTRAL
 )
 
 sealed interface RobotEvent {
@@ -41,16 +42,23 @@ sealed interface RobotEvent {
     data class SpeechModeInfo(val notice: String) : RobotEvent
     data class AudioLevelChanged(val level: Float) : RobotEvent
     data object WakeUp : RobotEvent
+    data class SetExpression(val expression: FaceExpression, val durationMs: Long? = null) : RobotEvent
 }
 
 class RobotBrain {
     private val _state = MutableStateFlow(RobotState())
     val state: StateFlow<RobotState> = _state.asStateFlow()
 
+    val expressionController = ExpressionController()
+
     private val events = Channel<RobotEvent>(Channel.BUFFERED)
 
     fun send(event: RobotEvent) {
         events.trySend(event)
+    }
+
+    fun setExpression(expression: FaceExpression, durationMs: Long? = null) {
+        send(RobotEvent.SetExpression(expression, durationMs))
     }
 
     suspend fun run() {
@@ -86,6 +94,13 @@ class RobotBrain {
                 }
             }
 
+            // Expression controller bridge
+            launch {
+                expressionController.currentExpression.collect { expr ->
+                    _state.update { it.copy(currentExpression = expr) }
+                }
+            }
+
             // Event processing loop
             launch {
                 var happyJob: Job? = null
@@ -97,6 +112,10 @@ class RobotBrain {
                         android.util.Log.d("RobotBrain", "Processing event: $event")
                     }
                     when (event) {
+                        is RobotEvent.SetExpression -> {
+                            expressionController.setExpression(event.expression, event.durationMs)
+                        }
+
                         RobotEvent.Petted -> {
                             if (_state.value.isSleeping) {
                                 // Petting wakes the robot up!
@@ -104,8 +123,9 @@ class RobotBrain {
                             }
                             happyJob?.cancel()
                             _state.update { it.copy(isHappy = true) }
+                            expressionController.setExpression(FaceExpression.HAPPY, 1800L)
                             happyJob = launch {
-                                delay(1200)
+                                delay(1800)
                                 _state.update { it.copy(isHappy = false) }
                             }
                         }
@@ -114,8 +134,9 @@ class RobotBrain {
                             _state.update { it.copy(isSleeping = false) }
                             happyJob?.cancel()
                             _state.update { it.copy(isHappy = true) }
+                            expressionController.setExpression(FaceExpression.HAPPY, 2000L)
                             happyJob = launch {
-                                delay(1500)
+                                delay(2000)
                                 _state.update { it.copy(isHappy = false) }
                             }
                         }
@@ -200,31 +221,46 @@ class RobotBrain {
                                             gazeY = 0f
                                         )
                                     }
+                                    expressionController.setExpression(FaceExpression.SLEEPY, 3000L)
                                 }
                                 RobotAction.WakeUp -> {
                                     _state.update { it.copy(isSleeping = false) }
                                     happyJob?.cancel()
                                     _state.update { it.copy(isHappy = true) }
+                                    expressionController.setExpression(FaceExpression.HAPPY, 2000L)
                                     happyJob = launch {
-                                        delay(1500)
+                                        delay(2000)
                                         _state.update { it.copy(isHappy = false) }
                                     }
                                 }
                                 RobotAction.HappyBounce -> {
                                     happyJob?.cancel()
                                     _state.update { it.copy(isHappy = true) }
+                                    expressionController.setExpression(FaceExpression.HAPPY, 2000L)
                                     happyJob = launch {
-                                        delay(1500)
+                                        delay(2000)
                                         _state.update { it.copy(isHappy = false) }
                                     }
                                 }
                                 null -> {
-                                    if (event.response.emotion == RobotEmotion.HAPPY) {
-                                        happyJob?.cancel()
-                                        _state.update { it.copy(isHappy = true) }
-                                        happyJob = launch {
-                                            delay(1200)
-                                            _state.update { it.copy(isHappy = false) }
+                                    when (event.response.emotion) {
+                                        RobotEmotion.HAPPY -> {
+                                            happyJob?.cancel()
+                                            _state.update { it.copy(isHappy = true) }
+                                            expressionController.setExpression(FaceExpression.HAPPY, 2500L)
+                                            happyJob = launch {
+                                                delay(2500)
+                                                _state.update { it.copy(isHappy = false) }
+                                            }
+                                        }
+                                        RobotEmotion.CURIOUS -> {
+                                            expressionController.setExpression(FaceExpression.CURIOUS, 3000L)
+                                        }
+                                        RobotEmotion.SLEEPY -> {
+                                            expressionController.setExpression(FaceExpression.SLEEPY, 3500L)
+                                        }
+                                        RobotEmotion.NORMAL -> {
+                                            expressionController.resetToNeutral()
                                         }
                                     }
                                 }

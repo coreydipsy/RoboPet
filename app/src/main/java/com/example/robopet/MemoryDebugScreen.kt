@@ -30,11 +30,12 @@ fun MemoryDebugScreen(
     onDeviceEngine: OnDeviceDialogueEngine? = null,
     hybridEngine: HybridDialogueEngine? = null,
     speechOutput: SpeechOutput? = null,
+    robotBrain: RobotBrain? = null,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Facts", "History", "Summaries", "Voice", "On-Device SLM")
+    val tabs = listOf("Facts", "History", "Summaries", "Voice", "On-Device SLM", "Expressions")
 
     val facts by memoryManager.getAllFactsFlow().collectAsState(initial = emptyList())
     val messages by memoryManager.getAllMessagesFlow().collectAsState(initial = emptyList())
@@ -659,6 +660,131 @@ fun MemoryDebugScreen(
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Text("On-device engine not configured.", color = Color.Gray)
+                        }
+                    }
+                }
+                5 -> {
+                    // Expressions Preview Tab
+                    val robotState = robotBrain?.state?.collectAsState()?.value
+                    val currentExpr = robotState?.currentExpression ?: FaceExpression.NEUTRAL
+
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161F33)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text("Rich Facial Expression Preview", color = Color(0xFF86E5FF), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "Manually trigger and preview any of RoboPet's 6 emotional expressions. Eye gaze tracking and natural blinking continue smoothly during all expressions.",
+                                        color = Color.LightGray,
+                                        fontSize = 12.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        "Active Expression: ${currentExpr.displayName.uppercase()} ${if (robotState?.isSleeping == true) "(Sleeping)" else ""}",
+                                        color = Color(0xFF9CFF9C),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        items(FaceExpression.entries) { expr ->
+                            val isActive = currentExpr == expr && robotState?.isSleeping != true
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isActive) Color(0xFF1E3A5F) else Color(0xFF111726)
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = expr.displayName,
+                                            color = if (isActive) Color(0xFF86E5FF) else Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp
+                                        )
+                                        Text(
+                                            text = expr.description,
+                                            color = Color.LightGray,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = {
+                                                robotBrain?.setExpression(expr, durationMs = 3500L)
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (isActive) Color(0xFF00ADB5) else Color(0xFF26334D)
+                                            )
+                                        ) {
+                                            Text(if (isActive) "Active ✓" else "Preview (3.5s)", fontSize = 12.sp)
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = {
+                                                robotBrain?.setExpression(expr, durationMs = null)
+                                            }
+                                        ) {
+                                            Text("Hold", fontSize = 12.sp, color = Color(0xFF86E5FF))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161F33)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text("Sleep / Wake Face Controls", color = Color(0xFF86E5FF), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Button(
+                                            onClick = {
+                                                robotBrain?.send(RobotEvent.DialogueProcessed(DialogueResponse(text = "", action = RobotAction.Sleep)))
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF26334D)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("😴 Sleep")
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                robotBrain?.send(RobotEvent.WakeUp)
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00ADB5)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("☀️ Wake Up")
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

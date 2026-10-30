@@ -197,6 +197,7 @@ fun RobotApp() {
                 onDeviceEngine = onDeviceEngine,
                 hybridEngine = dialogueEngine,
                 speechOutput = speechOutput,
+                robotBrain = brain,
                 onClose = { showMemoryDebug = false }
             )
         } else {
