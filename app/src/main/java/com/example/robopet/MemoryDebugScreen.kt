@@ -31,11 +31,12 @@ fun MemoryDebugScreen(
     hybridEngine: HybridDialogueEngine? = null,
     speechOutput: SpeechOutput? = null,
     robotBrain: RobotBrain? = null,
+    cameraPerception: CameraPerception? = null,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Facts", "History", "Summaries", "Voice", "On-Device SLM", "Expressions")
+    val tabs = listOf("Facts", "History", "Summaries", "Voice", "On-Device SLM", "Expressions", "Companion")
 
     val facts by memoryManager.getAllFactsFlow().collectAsState(initial = emptyList())
     val messages by memoryManager.getAllMessagesFlow().collectAsState(initial = emptyList())
@@ -92,10 +93,11 @@ fun MemoryDebugScreen(
             }
 
             // Tabs
-            TabRow(
+            ScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = Color(0xFF181F30),
-                contentColor = Color(0xFF86E5FF)
+                contentColor = Color(0xFF86E5FF),
+                edgePadding = 8.dp
             ) {
                 tabs.forEachIndexed { index, title ->
                     Tab(
@@ -781,6 +783,298 @@ fun MemoryDebugScreen(
                                             modifier = Modifier.weight(1f)
                                         ) {
                                             Text("☀️ Wake Up")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                6 -> {
+                    // Living Companion Tab
+                    val robotState = robotBrain?.state?.collectAsState()?.value
+                    val drives = robotBrain?.personalityEngine?.drives?.collectAsState()?.value
+                    val traits = robotBrain?.personalityEngine?.traits?.collectAsState()?.value
+
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        // Status & Telemetry Card
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161F33)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text("Living Companion Telemetry", color = Color(0xFF86E5FF), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Active Expression:", color = Color.LightGray, fontSize = 12.sp)
+                                        Text("${robotState?.currentExpression?.displayName ?: "NEUTRAL"} ${if (robotState?.isSleeping == true) "(Sleeping)" else ""}", color = Color(0xFF9CFF9C), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Attention Target:", color = Color.LightGray, fontSize = 12.sp)
+                                        Text("${robotState?.attentionTarget ?: AttentionTargetType.NONE}", color = Color(0xFF86E5FF), fontSize = 12.sp)
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Face Detected:", color = Color.LightGray, fontSize = 12.sp)
+                                        Text(if (robotState?.faceDetected == true) "YES (Gaze: ${String.format("%.1f", robotState.gazeX)}, ${String.format("%.1f", robotState.gazeY)})" else "NO", color = if (robotState?.faceDetected == true) Color(0xFF9CFF9C) else Color.Gray, fontSize = 12.sp)
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Face Inference Latency:", color = Color.LightGray, fontSize = 12.sp)
+                                        Text("${cameraPerception?.faceLatencyMs ?: 0} ms", color = Color(0xFFFFD54F), fontSize = 12.sp)
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Last Hand Gesture:", color = Color.LightGray, fontSize = 12.sp)
+                                        Text("${robotState?.lastGesture ?: HandGesture.NONE} (${String.format("%.0f%%", (robotState?.gestureConfidence ?: 0f) * 100)})", color = Color(0xFF86E5FF), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Gesture Inference Latency:", color = Color.LightGray, fontSize = 12.sp)
+                                        Text("${cameraPerception?.gestureLatencyMs ?: 0} ms", color = Color(0xFFFFD54F), fontSize = 12.sp)
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Spontaneous Actions Triggered:", color = Color.LightGray, fontSize = 12.sp)
+                                        Text("${drives?.spontaneousActionCount ?: 0}", color = Color.White, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Toggles Card
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161F33)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text("Autonomous & Perception Controls", color = Color(0xFF86E5FF), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("Autonomous Behavior", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                            Text("Idle glances, curiosity tilts, and sleep timeouts", color = Color.LightGray, fontSize = 11.sp)
+                                        }
+                                        Switch(
+                                            checked = drives?.isAutonomousEnabled ?: true,
+                                            onCheckedChange = {
+                                                robotBrain?.send(RobotEvent.SetAutonomousEnabled(it))
+                                            }
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("Quiet Mode", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                            Text("Mutes sound effects and softens dramatic idle movements", color = Color.LightGray, fontSize = 11.sp)
+                                        }
+                                        Switch(
+                                            checked = drives?.isQuietMode ?: false,
+                                            onCheckedChange = {
+                                                robotBrain?.send(RobotEvent.SetQuietMode(it))
+                                            }
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("Hand Gesture Recognition", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                            Text("Disable to save CPU when gestures are not needed", color = Color.LightGray, fontSize = 11.sp)
+                                        }
+                                        Switch(
+                                            checked = cameraPerception?.isGestureEnabled ?: true,
+                                            onCheckedChange = {
+                                                cameraPerception?.isGestureEnabled = it
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Personality Drives Card
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161F33)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text("Personality Traits & Drives", color = Color(0xFF86E5FF), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text("Energy: ${String.format("%.0f%%", (drives?.energy ?: 1f) * 100)}", color = Color.LightGray, fontSize = 12.sp)
+                                    LinearProgressIndicator(
+                                        progress = { drives?.energy ?: 1f },
+                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                        color = Color(0xFF00ADB5),
+                                        trackColor = Color(0xFF26334D)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("Curiosity Drive: ${String.format("%.0f%%", (drives?.curiosityLevel ?: 0.7f) * 100)}", color = Color.LightGray, fontSize = 12.sp)
+                                    LinearProgressIndicator(
+                                        progress = { drives?.curiosityLevel ?: 0.7f },
+                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                        color = Color(0xFFFFB74D),
+                                        trackColor = Color(0xFF26334D)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("Social Interest: ${String.format("%.0f%%", (drives?.socialInterest ?: 0.6f) * 100)}", color = Color.LightGray, fontSize = 12.sp)
+                                    LinearProgressIndicator(
+                                        progress = { drives?.socialInterest ?: 0.6f },
+                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                        color = Color(0xFF81C784),
+                                        trackColor = Color(0xFF26334D)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        "Persistent Traits: Curiosity (${traits?.curiosity ?: 0.7f}), Affection (${traits?.affection ?: 0.65f}), Playfulness (${traits?.playfulness ?: 0.75f}), Independence (${traits?.independence ?: 0.55f}), Sociability (${traits?.sociability ?: 0.45f})",
+                                        color = Color.Gray,
+                                        fontSize = 11.sp
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(
+                                        onClick = { robotBrain?.personalityEngine?.resetDrives() },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF26334D)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Reset Temporary Drives", fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Gesture & Event Simulator Card
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161F33)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text("Simulation Studio (No Camera Needed)", color = Color(0xFF86E5FF), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Directly trigger gestures, presence events, or audio FX to test behaviors:", color = Color.LightGray, fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = {
+                                                robotBrain?.send(RobotEvent.GestureDetected(RecognizedGesture(HandGesture.WAVE, 0.95f, 0.5f, 0.5f, 0.25f)))
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("👋 Wave", fontSize = 12.sp)
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                robotBrain?.send(RobotEvent.GestureDetected(RecognizedGesture(HandGesture.THUMB_UP, 0.96f, 0.5f, 0.5f, 0.25f)))
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00796B)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("👍 Thumb Up", fontSize = 12.sp)
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = {
+                                                robotBrain?.send(RobotEvent.GestureDetected(RecognizedGesture(HandGesture.THUMB_DOWN, 0.92f, 0.5f, 0.5f, 0.25f)))
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("👎 Thumb Down", fontSize = 12.sp)
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                robotBrain?.send(RobotEvent.GestureDetected(RecognizedGesture(HandGesture.VICTORY, 0.94f, 0.5f, 0.5f, 0.25f)))
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6A1B9A)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("✌️ Victory", fontSize = 12.sp)
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = {
+                                                robotBrain?.send(RobotEvent.GestureDetected(RecognizedGesture(HandGesture.OPEN_PALM, 0.90f, 0.35f, 0.45f, 0.25f)))
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0277BD)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("✋ Open Palm", fontSize = 12.sp)
+                                        }
+
+                                        Button(
+                                            onClick = {
+                                                robotBrain?.send(RobotEvent.GestureDetected(RecognizedGesture(HandGesture.APPROACHING, 0.88f, 0.5f, 0.5f, 0.45f)))
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF6C00)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("🫳 Hand Near", fontSize = 12.sp)
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text("Procedural Sound FX Test:", color = Color.LightGray, fontSize = 12.sp)
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedButton(
+                                            onClick = { robotBrain?.soundEffects?.play(SoundEffectType.HAPPY_CHIRP) },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("Chirp", fontSize = 11.sp, color = Color(0xFF86E5FF))
+                                        }
+                                        OutlinedButton(
+                                            onClick = { robotBrain?.soundEffects?.play(SoundEffectType.CURIOUS_SQUEAK) },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("Squeak", fontSize = 11.sp, color = Color(0xFF86E5FF))
+                                        }
+                                        OutlinedButton(
+                                            onClick = { robotBrain?.soundEffects?.play(SoundEffectType.PLAYFUL_TRILL) },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("Trill", fontSize = 11.sp, color = Color(0xFF86E5FF))
                                         }
                                     }
                                 }

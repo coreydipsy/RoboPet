@@ -44,7 +44,7 @@ fun RobotApp() {
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
 
-    val brain = remember { RobotBrain() }
+    val brain = remember { RobotBrain(context) }
     val perception = remember { CameraPerception(context) }
     val memoryManager = remember { MemoryManager(context) }
     val geminiEngine = remember { GeminiDialogueEngine(context, memoryManager) }
@@ -159,6 +159,11 @@ fun RobotApp() {
         }
     }
 
+    LaunchedEffect(state.isSpeaking, state.isListening, state.isThinking, state.isSleeping) {
+        perception.isHeavyComputeActive = state.isSpeaking || state.isListening || state.isThinking
+        perception.isSleeping = state.isSleeping
+    }
+
     DisposableEffect(Unit) {
         val testReceiver = object : BroadcastReceiver() {
             override fun onReceive(c: Context?, intent: Intent?) {
@@ -198,6 +203,7 @@ fun RobotApp() {
                 hybridEngine = dialogueEngine,
                 speechOutput = speechOutput,
                 robotBrain = brain,
+                cameraPerception = perception,
                 onClose = { showMemoryDebug = false }
             )
         } else {

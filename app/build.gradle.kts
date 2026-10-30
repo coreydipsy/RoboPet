@@ -36,6 +36,9 @@ android {
     buildFeatures {
         compose = true
     }
+    androidResources {
+        noCompress.addAll(listOf("task", "tflite"))
+    }
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
@@ -60,6 +63,9 @@ dependencies {
     implementation("androidx.camera:camera-camera2:1.5.0")
     implementation("androidx.camera:camera-lifecycle:1.5.0")
     implementation("com.google.mlkit:face-detection:16.1.7")
+
+    // MediaPipe Tasks Vision (Gesture Recognition)
+    implementation("com.google.mediapipe:tasks-vision:0.10.14")
 
     // Room
     implementation(libs.androidx.room.runtime)
