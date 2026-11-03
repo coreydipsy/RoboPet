@@ -72,4 +72,14 @@ interface MemoryDao {
 
     @Query("SELECT * FROM summaries ORDER BY timestamp DESC LIMIT :limit")
     suspend fun getRecentSummaries(limit: Int): List<SummaryEntity>
+
+    // Relationship & Personality Evolution Stats
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertRelationshipStats(stats: RelationshipStatsEntity)
+
+    @Query("SELECT * FROM relationship_stats WHERE id = 1 LIMIT 1")
+    fun getRelationshipStatsFlow(): Flow<RelationshipStatsEntity?>
+
+    @Query("SELECT * FROM relationship_stats WHERE id = 1 LIMIT 1")
+    suspend fun getRelationshipStats(): RelationshipStatsEntity?
 }

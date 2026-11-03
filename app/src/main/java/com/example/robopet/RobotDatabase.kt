@@ -6,8 +6,13 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [ConversationEntity::class, FactEntity::class, SummaryEntity::class],
-    version = 1,
+    entities = [
+        ConversationEntity::class,
+        FactEntity::class,
+        SummaryEntity::class,
+        RelationshipStatsEntity::class
+    ],
+    version = 2,
     exportSchema = false
 )
 abstract class RobotDatabase : RoomDatabase() {

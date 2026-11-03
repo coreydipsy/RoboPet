@@ -18,10 +18,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 enum class HandGesture {
     NONE,
+    CLOSED_FIST,
     OPEN_PALM,
     THUMB_UP,
     THUMB_DOWN,
     VICTORY,
+    POINTING_UP,
     WAVE,
     APPROACHING
 }
@@ -129,6 +131,7 @@ class GesturePerception(context: Context) {
     private var lastTriggerTime: Long = 0L
 
     var isEnabled: Boolean = true
+    var isRpsActive: Boolean = false
     var lastInferenceTimeMs: Long = 0L
         private set
     var lastConfidence: Float = 0f
@@ -271,16 +274,21 @@ class GesturePerception(context: Context) {
         // Map MediaPipe static categories
         val detected = when {
             handSize >= APPROACHING_HAND_SIZE_THRESHOLD -> HandGesture.APPROACHING
+            categoryName.equals("Closed_Fist", ignoreCase = true) -> HandGesture.CLOSED_FIST
             categoryName.equals("Open_Palm", ignoreCase = true) -> HandGesture.OPEN_PALM
             categoryName.equals("Thumb_Up", ignoreCase = true) -> HandGesture.THUMB_UP
             categoryName.equals("Thumb_Down", ignoreCase = true) -> HandGesture.THUMB_DOWN
             categoryName.equals("Victory", ignoreCase = true) -> HandGesture.VICTORY
+            categoryName.equals("Pointing_Up", ignoreCase = true) -> HandGesture.POINTING_UP
             else -> HandGesture.NONE
         }
 
         currentDetectedGesture = detected
 
-        if (detected == HandGesture.NONE || confidence < CONFIDENCE_THRESHOLD) {
+        val minConfidence = if (isRpsActive) 0.52f else CONFIDENCE_THRESHOLD
+        val requiredStability = if (isRpsActive) 60L else STABILITY_DURATION_MS
+
+        if (detected == HandGesture.NONE || confidence < minConfidence) {
             candidateGesture = HandGesture.NONE
             candidateStartTime = 0L
             return
@@ -294,20 +302,20 @@ class GesturePerception(context: Context) {
         }
 
         val heldDuration = now - candidateStartTime
-        if (heldDuration < STABILITY_DURATION_MS) {
+        if (heldDuration < requiredStability) {
             return
         }
 
-        // Cooldown check: prevent triggering the same gesture continuously
+        // Cooldown check: prevent triggering the same gesture continuously (bypassed during active RPS game!)
         val elapsedSinceTrigger = now - lastTriggerTime
-        if (detected == lastTriggeredGesture && elapsedSinceTrigger < DEFAULT_COOLDOWN_MS) {
+        if (!isRpsActive && detected == lastTriggeredGesture && elapsedSinceTrigger < DEFAULT_COOLDOWN_MS) {
             return
         }
 
         // Confirmed stable gesture outside cooldown!
         lastTriggerTime = now
         lastTriggeredGesture = detected
-        Log.d(TAG, "Triggered gesture: $detected (confidence: $confidence, handSize: $handSize)")
+        Log.d(TAG, "Triggered gesture: $detected (confidence: $confidence, handSize: $handSize, rpsActive=$isRpsActive)")
 
         onGestureEvent(
             RecognizedGesture(

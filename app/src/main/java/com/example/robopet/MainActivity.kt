@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.os.BatteryManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,12 +23,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -44,7 +45,23 @@ fun RobotApp() {
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
 
-    val brain = remember { RobotBrain(context) }
+    var brainHolder by remember { mutableStateOf<RobotBrain?>(null) }
+    var speechInputHolder by remember { mutableStateOf<SpeechInput?>(null) }
+    val speechOutput = remember {
+        SpeechOutput(context) { isSpeaking, text ->
+            brainHolder?.send(RobotEvent.SpeakingChanged(isSpeaking, text))
+            if (isSpeaking) {
+                speechInputHolder?.pauseWakeWordListening()
+            } else {
+                speechInputHolder?.resumeWakeWordListening(delayMs = 800L)
+            }
+        }
+    }
+    val brain = remember {
+        RobotBrain(context) { text ->
+            speechOutput.speak(text)
+        }.also { brainHolder = it }
+    }
     val perception = remember { CameraPerception(context) }
     val memoryManager = remember { MemoryManager(context) }
     val geminiEngine = remember { GeminiDialogueEngine(context, memoryManager) }
@@ -85,9 +102,38 @@ fun RobotApp() {
         hasCameraPermission = granted
     }
 
-    val speechOutput = remember {
-        SpeechOutput(context) { isSpeaking, text ->
-            brain.send(RobotEvent.SpeakingChanged(isSpeaking, text))
+    fun processSpeechOrCommand(text: String) {
+        val lower = text.lowercase(Locale.ROOT).trim()
+        when {
+            lower.contains("rock paper scissors") || lower.contains("play rock") -> {
+                brain.send(RobotEvent.StartRockPaperScissors)
+                return
+            }
+            lower.contains("start pomodoro") || lower.contains("start focus") || lower.contains("focus mode") -> {
+                brain.send(RobotEvent.StartPomodoro(25))
+                return
+            }
+            lower.contains("stop timer") || lower.contains("stop focus") || lower.contains("cancel timer") || lower.contains("stop pomodoro") -> {
+                brain.send(RobotEvent.StopPomodoro)
+                return
+            }
+            lower.contains("take a break") || lower.contains("start break") -> {
+                brain.send(RobotEvent.StartBreak(5))
+                return
+            }
+        }
+
+        brain.send(RobotEvent.ThinkingChanged(true))
+        coroutineScope.launch {
+            val response = dialogueEngine.processInput(
+                input = text,
+                isSleeping = brain.state.value.isSleeping
+            )
+            brain.send(RobotEvent.ThinkingChanged(false))
+            brain.send(RobotEvent.DialogueProcessed(response))
+            val statusText = dialogueEngine.currentEngineStatus.value
+            brain.send(RobotEvent.SpeechModeInfo("Using on-device speech recognition. | $statusText"))
+            speechOutput.speak(response.text)
         }
     }
 
@@ -96,19 +142,7 @@ fun RobotApp() {
             context = context,
             onResult = { text ->
                 brain.send(RobotEvent.SpeechRecognized(text))
-                brain.send(RobotEvent.ThinkingChanged(true))
-                coroutineScope.launch {
-                    val response = dialogueEngine.processInput(
-                        input = text,
-                        isSleeping = brain.state.value.isSleeping
-                    )
-                    brain.send(RobotEvent.ThinkingChanged(false))
-                    brain.send(RobotEvent.DialogueProcessed(response))
-                    val statusText = dialogueEngine.currentEngineStatus.value
-                    brain.send(RobotEvent.SpeechModeInfo("Using on-device speech recognition. | $statusText"))
-                    // Ensure recognizer is stopped before robot speaks to avoid self-recognition
-                    speechOutput.speak(response.text)
-                }
+                processSpeechOrCommand(text)
             },
             onListeningStateChanged = { isListening ->
                 brain.send(RobotEvent.ListeningChanged(isListening))
@@ -123,11 +157,24 @@ fun RobotApp() {
             onRmsChanged = { rms ->
                 brain.send(RobotEvent.AudioLevelChanged(rms))
             },
+            onWakeWordStateChanged = { isListening ->
+                brain.send(RobotEvent.WakeWordStateChanged(isListening))
+            },
+            onWakeWordDetected = { phrase, command ->
+                brain.send(RobotEvent.WakeWordTriggered(phrase, command))
+                if (!command.isNullOrBlank()) {
+                    brain.send(RobotEvent.SpeechRecognized(command))
+                    processSpeechOrCommand(command)
+                } else {
+                    speechOutput.speak("I'm listening!")
+                    speechInputHolder?.startListening()
+                }
+            },
             canListenProvider = {
                 // Prevent recognizing own TTS speech
                 !brain.state.value.isSpeaking
             }
-        )
+        ).also { speechInputHolder = it }
     }
 
     val audioPermissionLauncher = rememberLauncherForActivityResult(
@@ -136,6 +183,12 @@ fun RobotApp() {
         hasAudioPermission = granted
         if (granted && !brain.state.value.isSpeaking) {
             speechInput.startListening()
+        }
+    }
+
+    LaunchedEffect(hasAudioPermission) {
+        if (hasAudioPermission) {
+            speechInput.resumeWakeWordListening(delayMs = 1200L)
         }
     }
 
@@ -159,8 +212,9 @@ fun RobotApp() {
         }
     }
 
-    LaunchedEffect(state.isSpeaking, state.isListening, state.isThinking, state.isSleeping) {
-        perception.isHeavyComputeActive = state.isSpeaking || state.isListening || state.isThinking
+    LaunchedEffect(state.isSpeaking, state.isListening, state.isThinking, state.isSleeping, state.miniGameState.isRpsActive) {
+        perception.isRpsActive = state.miniGameState.isRpsActive
+        perception.isHeavyComputeActive = if (state.miniGameState.isRpsActive) false else (state.isSpeaking || state.isListening || state.isThinking)
         perception.isSleeping = state.isSleeping
     }
 
@@ -181,9 +235,31 @@ fun RobotApp() {
             ContextCompat.RECEIVER_EXPORTED
         )
 
+        val batteryReceiver = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, intent: Intent?) {
+                val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+                val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                        status == BatteryManager.BATTERY_STATUS_FULL
+                val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+                val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+                val pct = if (scale > 0) (level * 100 / scale) else level
+                brain.send(RobotEvent.BatteryChanged(isCharging, pct))
+            }
+        }
+        val batteryFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        ContextCompat.registerReceiver(
+            context,
+            batteryReceiver,
+            batteryFilter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+
         onDispose {
             try {
                 context.unregisterReceiver(testReceiver)
+            } catch (_: Exception) {}
+            try {
+                context.unregisterReceiver(batteryReceiver)
             } catch (_: Exception) {}
             perception.close()
             speechInput.destroy()
@@ -193,6 +269,50 @@ fun RobotApp() {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        RobotFace(
+            state = state,
+            onPet = {
+                brain.send(RobotEvent.Petted)
+            },
+            onTapScreen = {
+                // Interrupt TTS immediately if speaking so RoboPet stops talking and starts listening
+                if (state.isSpeaking) {
+                    speechOutput.stop()
+                }
+
+                if (!hasAudioPermission) {
+                    audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                } else {
+                    if (state.isListening) {
+                        speechInput.stopListening()
+                    } else {
+                        speechInput.startListening()
+                    }
+                }
+            },
+            onStartFocus = {
+                if (state.pomodoroState.mode == PomodoroMode.FOCUS) {
+                    brain.send(RobotEvent.StopPomodoro)
+                } else {
+                    brain.send(RobotEvent.StartPomodoro(25))
+                }
+            },
+            onStartRps = {
+                if (state.miniGameState.isRpsActive) {
+                    brain.send(RobotEvent.StopRockPaperScissors)
+                } else {
+                    brain.send(RobotEvent.StartRockPaperScissors)
+                }
+            },
+            onSelectRpsChoice = { choice ->
+                brain.send(RobotEvent.SelectRpsChoice(choice))
+            },
+            onMemoryClick = {
+                showMemoryDebug = true
+            }
+        )
+
+        // Apple-style Glassmorphic Modal Sheet for Companion Studio & Memory
         if (showMemoryDebug) {
             MemoryDebugScreen(
                 memoryManager = memoryManager,
@@ -202,41 +322,10 @@ fun RobotApp() {
                 onDeviceEngine = onDeviceEngine,
                 hybridEngine = dialogueEngine,
                 speechOutput = speechOutput,
+                speechInput = speechInput,
                 robotBrain = brain,
                 cameraPerception = perception,
                 onClose = { showMemoryDebug = false }
-            )
-        } else {
-            RobotFace(
-                state = state,
-                onPet = {
-                    brain.send(RobotEvent.Petted)
-                },
-                onTapScreen = {
-                    // Interrupt TTS immediately if speaking so RoboPet stops talking and starts listening
-                    if (state.isSpeaking) {
-                        speechOutput.stop()
-                    }
-
-                    if (!hasAudioPermission) {
-                        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    } else {
-                        if (state.isListening) {
-                            speechInput.stopListening()
-                        } else {
-                            speechInput.startListening()
-                        }
-                    }
-                },
-                onMemoryClick = {
-                    showMemoryDebug = true
-                }
-            )
-
-            FaceDebugIndicator(
-                detected = state.faceDetected,
-                speechNotice = state.speechModeNotice,
-                modifier = Modifier.align(Alignment.TopCenter)
             )
         }
     }

@@ -52,6 +52,18 @@ class PersonalityEngine(context: Context? = null) {
         )
     }
 
+    fun updateTraits(newTraits: PersonalityTraits) {
+        _traits.value = newTraits
+        prefs?.edit()?.apply {
+            putFloat("trait_curiosity", newTraits.curiosity)
+            putFloat("trait_affection", newTraits.affection)
+            putFloat("trait_playfulness", newTraits.playfulness)
+            putFloat("trait_independence", newTraits.independence)
+            putFloat("trait_sociability", newTraits.sociability)
+            apply()
+        }
+    }
+
     fun setQuietMode(enabled: Boolean) {
         _drives.update { it.copy(isQuietMode = enabled) }
         prefs?.edit()?.putBoolean("quiet_mode", enabled)?.apply()

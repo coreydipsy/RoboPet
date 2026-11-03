@@ -29,3 +29,36 @@ data class SummaryEntity(
     val summary: String,
     val timestamp: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "relationship_stats")
+data class RelationshipStatsEntity(
+    @PrimaryKey
+    val id: Int = 1,
+    val score: Int = 120, // 0 to 1000
+    val totalInteractions: Int = 0,
+    val petCount: Int = 0,
+    val chatCount: Int = 0,
+    val gestureCount: Int = 0,
+    val affection: Float = 0.65f,
+    val sociability: Float = 0.45f,
+    val playfulness: Float = 0.75f,
+    val curiosity: Float = 0.70f,
+    val independence: Float = 0.55f,
+    val lastInteractionDate: Long = System.currentTimeMillis()
+) {
+    val stage: String
+        get() = when {
+            score >= 800 -> "Best Friend / Soulmate"
+            score >= 500 -> "Close Companion"
+            score >= 250 -> "Familiar Friend"
+            else -> "New Acquaintance"
+        }
+
+    val stageLevel: Int
+        get() = when {
+            score >= 800 -> 4
+            score >= 500 -> 3
+            score >= 250 -> 2
+            else -> 1
+        }
+}

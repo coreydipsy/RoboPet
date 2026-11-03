@@ -2,9 +2,11 @@ package com.example.robopet
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,6 +32,7 @@ fun MemoryDebugScreen(
     onDeviceEngine: OnDeviceDialogueEngine? = null,
     hybridEngine: HybridDialogueEngine? = null,
     speechOutput: SpeechOutput? = null,
+    speechInput: SpeechInput? = null,
     robotBrain: RobotBrain? = null,
     cameraPerception: CameraPerception? = null,
     onClose: () -> Unit,
@@ -51,72 +54,112 @@ fun MemoryDebugScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF0F121C))
-            .padding(16.dp)
+            .background(Color(0xE60A0D14)) // Deep Frosted Acrylic Backdrop
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header
+            // Apple Modal Grabber Handle
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(bottom = 12.dp)
+                    .width(36.dp)
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(2.5.dp))
+                    .background(Color(0x38FFFFFF))
+            )
+
+            // Header Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp),
+                    .padding(bottom = 14.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "RoboPet Memory Debug",
-                        color = Color(0xFF86E5FF),
+                        text = "RoboPet Studio",
+                        color = Color.White,
                         fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.3.sp
                     )
                     Text(
-                        text = if (isFirebaseReady) "Engine: Gemini ($modelName)" else "Engine: Local Offline (Rules + Room)",
-                        color = if (isFirebaseReady) Color(0xFF9CFF9C) else Color(0xFFFFC080),
-                        fontSize = 11.sp
+                        text = if (isFirebaseReady) "AI Companion • Gemini + LiteRT-LM" else "AI Companion • On-Device Neural",
+                        color = Color(0xFF8E8E93),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
                     )
-                    if (engineStatus.isNotEmpty()) {
+                }
+
+                // Apple Circular Glass Close Button
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x28FFFFFF))
+                        .border(0.8.dp, Color(0x38FFFFFF), CircleShape)
+                        .clickable { onClose() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "✕",
+                        color = Color(0xFFE5E5EA),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Apple Segmented Control Tabs
+            ScrollableTabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = Color(0x1AFFFFFF),
+                contentColor = Color.White,
+                indicator = {},
+                divider = {},
+                edgePadding = 6.dp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(22.dp))
+                    .border(0.8.dp, Color(0x28FFFFFF), RoundedCornerShape(22.dp))
+                    .padding(vertical = 4.dp)
+            ) {
+                tabs.forEachIndexed { index, title ->
+                    val isSelected = selectedTab == index
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(if (isSelected) Color(0x4D00C7BE) else Color.Transparent)
+                            .border(
+                                width = if (isSelected) 0.8.dp else 0.dp,
+                                color = if (isSelected) Color(0xFF00C7BE).copy(alpha = 0.6f) else Color.Transparent,
+                                shape = RoundedCornerShape(18.dp)
+                            )
+                            .clickable { selectedTab = index }
+                            .padding(horizontal = 14.dp, vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val count = when (index) {
+                            0 -> " (${facts.size})"
+                            1 -> " (${messages.size})"
+                            2 -> " (${summaries.size})"
+                            else -> ""
+                        }
                         Text(
-                            text = "Status: $engineStatus",
-                            color = if (engineStatus.startsWith("Gemini Active") || engineStatus.startsWith("Ready")) Color(0xFF9CFF9C) else Color(0xFFFF9E80),
-                            fontSize = 10.sp
+                            text = "$title$count",
+                            color = if (isSelected) Color.White else Color(0xFF8E8E93),
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                         )
                     }
                 }
-
-                Button(
-                    onClick = onClose,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF26334D))
-                ) {
-                    Text("Close", color = Color.White)
-                }
             }
 
-            // Tabs
-            ScrollableTabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = Color(0xFF181F30),
-                contentColor = Color(0xFF86E5FF),
-                edgePadding = 8.dp
-            ) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = {
-                            val label = when (index) {
-                                0 -> "$title (${facts.size})"
-                                1 -> "$title (${messages.size})"
-                                2 -> "$title (${summaries.size})"
-                                else -> title
-                            }
-                            Text(label)
-                        }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             when (selectedTab) {
                 0 -> {
@@ -1075,6 +1118,459 @@ fun MemoryDebugScreen(
                                             modifier = Modifier.weight(1f)
                                         ) {
                                             Text("Trill", fontSize = 11.sp, color = Color(0xFF86E5FF))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Option 2: Relationship Evolution Card
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161F33)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Relationship Evolution", color = Color(0xFF86E5FF), fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                        Surface(
+                                            color = Color(0xFF00ADB5),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Text(
+                                                "⭐ Lv.${robotState?.relationshipLevel ?: 1}",
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "Stages: Stranger (Lv.1) ➔ Acquaintance (Lv.2) ➔ Companion (Lv.3) ➔ Best Friend (Lv.4). Interacting, petting, and speaking boosts your bond.",
+                                        color = Color.LightGray,
+                                        fontSize = 11.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Stage: ${robotState?.relationshipStage ?: "New Acquaintance"}", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                        Text("Score: ${robotState?.relationshipScore ?: 0} pts", color = Color(0xFF9CFF9C), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    val progressFraction = ((robotState?.relationshipScore ?: 0) / 1000f).coerceIn(0f, 1f)
+                                    LinearProgressIndicator(
+                                        progress = { progressFraction },
+                                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                        color = Color(0xFF00ADB5),
+                                        trackColor = Color(0xFF26334D)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text("Test Interaction Rewards:", color = Color.LightGray, fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = { robotBrain?.relationshipManager?.recordPet() },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("+5 Pet", fontSize = 11.sp)
+                                        }
+                                        Button(
+                                            onClick = { robotBrain?.relationshipManager?.recordChat() },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0277BD)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("+10 Chat", fontSize = 11.sp)
+                                        }
+                                        Button(
+                                            onClick = { robotBrain?.relationshipManager?.recordGesture() },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6A1B9A)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("+4 Gesture", fontSize = 11.sp)
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    OutlinedButton(
+                                        onClick = { robotBrain?.send(RobotEvent.ResetRelationship) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Reset Relationship to Stranger (0 pts)", color = Color(0xFFFF8080), fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+
+                        // Option 1: Spontaneous Verbal Interactions Card
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161F33)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Spontaneous Verbal Remarks", color = Color(0xFF86E5FF), fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                        Surface(
+                                            color = if (robotState?.spontaneousSpeechEnabled == true) Color(0xFF2E7D32) else Color(0xFF555555),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Text(
+                                                "${robotState?.spontaneousSpeechRemainingToday ?: 4} / 4 Left",
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "RoboPet proactively initiates brief, charming remarks (morning/afternoon/evening greetings, return greetings). Budget caps at 4/day and resets midnight.",
+                                        color = Color.LightGray,
+                                        fontSize = 11.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("Spontaneous Speech Allowed", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                            Text("Mutes remarks if disabled or in Quiet Mode", color = Color.LightGray, fontSize = 11.sp)
+                                        }
+                                        Switch(
+                                            checked = robotState?.spontaneousSpeechEnabled ?: true,
+                                            onCheckedChange = {
+                                                robotBrain?.send(RobotEvent.SetSpontaneousSpeechEnabled(it))
+                                            }
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = { robotBrain?.send(RobotEvent.TestSpontaneousSpeech) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00ADB5)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("🗣️ Test Remark Now", fontSize = 11.sp)
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = { robotBrain?.send(RobotEvent.ResetDailySpontaneousBudget) },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("Reset Budget (4)", fontSize = 11.sp, color = Color(0xFF86E5FF))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Option 3: Desk Clock & Charging Dock Mode Card
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161F33)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Text("Desk Clock & Charging Dock Mode", color = Color(0xFF86E5FF), fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "Displays a minimalist digital clock, date, and battery status at the top of RoboPet's face. Dims automatically to 45% at night (10 PM – 7 AM).",
+                                        color = Color.LightGray,
+                                        fontSize = 11.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Power Status:", color = Color.LightGray, fontSize = 12.sp)
+                                        Text(
+                                            if (robotState?.isCharging == true) "⚡ Charging (${robotState.batteryLevel}%)" else "🔋 Unplugged (${robotState?.batteryLevel ?: 100}%)",
+                                            color = if (robotState?.isCharging == true) Color(0xFF9CFF9C) else Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Night Dimming (10 PM - 7 AM):", color = Color.LightGray, fontSize = 12.sp)
+                                        Text(
+                                            if (robotState?.isNightDimmed == true) "🌙 Dimmed (45% Alpha)" else "☀️ Standard Brightness",
+                                            color = if (robotState?.isNightDimmed == true) Color(0xFFFFB74D) else Color(0xFF86E5FF),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Dock Display Visible:", color = Color.LightGray, fontSize = 12.sp)
+                                        Text(
+                                            if (robotState?.isDockClockVisible == true) "YES (${robotState.currentTimeString})" else "NO (Eyes Only)",
+                                            color = if (robotState?.isDockClockVisible == true) Color(0xFF9CFF9C) else Color.Gray,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Text("Dock Mode Trigger Setting:", color = Color.LightGray, fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    val currentDockSetting = robotState?.dockModeSetting ?: DockModeSetting.AUTO_ON_CHARGE
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Button(
+                                            onClick = { robotBrain?.send(RobotEvent.SetDockModeSetting(DockModeSetting.AUTO_ON_CHARGE)) },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (currentDockSetting == DockModeSetting.AUTO_ON_CHARGE) Color(0xFF00ADB5) else Color(0xFF26334D)
+                                            ),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("⚡ Auto Plug", fontSize = 10.sp)
+                                        }
+
+                                        Button(
+                                            onClick = { robotBrain?.send(RobotEvent.SetDockModeSetting(DockModeSetting.ALWAYS_ON)) },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (currentDockSetting == DockModeSetting.ALWAYS_ON) Color(0xFF00ADB5) else Color(0xFF26334D)
+                                            ),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("🕒 Always", fontSize = 10.sp)
+                                        }
+
+                                        Button(
+                                            onClick = { robotBrain?.send(RobotEvent.SetDockModeSetting(DockModeSetting.DISABLED)) },
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = if (currentDockSetting == DockModeSetting.DISABLED) Color(0xFF00ADB5) else Color(0xFF26334D)
+                                            ),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("🚫 Off", fontSize = 10.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Hands-Free Wake Word Card
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161F33)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Hands-Free Wake Word", color = Color(0xFF86E5FF), fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                        Surface(
+                                            color = if (robotState?.isWakeWordListening == true) Color(0xFF2E7D32) else Color(0xFF37474F),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Text(
+                                                if (robotState?.isWakeWordListening == true) "🟢 Active" else "⚪ Inactive",
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "Listens passively on-device for triggers: \"Hey RoboPet\", \"RoboPet\", \"Hey Buddy\", \"Wake up\". Pauses automatically during TTS playback.",
+                                        color = Color.LightGray,
+                                        fontSize = 11.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("Continuous Wake Word", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                            Text("Toggle passive offline listening", color = Color.LightGray, fontSize = 11.sp)
+                                        }
+                                        Switch(
+                                            checked = speechInput?.isWakeWordEnabled ?: (robotState?.isWakeWordEnabled ?: true),
+                                            onCheckedChange = {
+                                                speechInput?.setWakeWordEnabled(it)
+                                                robotBrain?.send(RobotEvent.SetWakeWordEnabled(it))
+                                            }
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = { speechInput?.simulateWakeWord("Hey RoboPet", null) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00ADB5)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("🗣️ Test 'Hey RoboPet'", fontSize = 11.sp)
+                                        }
+
+                                        OutlinedButton(
+                                            onClick = { speechInput?.simulateWakeWord("Hey RoboPet", "play rock paper scissors") },
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("Test + Command", fontSize = 11.sp, color = Color(0xFF86E5FF))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Interactive Mini-Games Card
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161F33)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Vision Mini-Games & Tricks", color = Color(0xFF86E5FF), fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                        Surface(
+                                            color = if (robotState?.miniGameState?.isRpsActive == true) Color(0xFFE65100) else Color(0xFF26334D),
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Text(
+                                                if (robotState?.miniGameState?.isRpsActive == true) "🎮 RPS Active" else "Idle",
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "Play Rock-Paper-Scissors (✊ Rock, ✋ Paper, ✌️ Scissors), Peek-a-Boo (hide face behind hands), or Follow My Finger (point up).",
+                                        color = Color.LightGray,
+                                        fontSize = 11.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = { robotBrain?.send(RobotEvent.StartRockPaperScissors) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("✊ Play RPS", fontSize = 11.sp)
+                                        }
+
+                                        if (robotState?.miniGameState?.isRpsActive == true) {
+                                            OutlinedButton(
+                                                onClick = { robotBrain?.send(RobotEvent.StopRockPaperScissors) },
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Text("Stop RPS", fontSize = 11.sp, color = Color(0xFFFF8080))
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        "Peek-a-Boo: Cover your face with both hands, then reveal yourself! RoboPet will gasp and chirp in delight.",
+                                        color = Color(0xFF86E5FF).copy(alpha = 0.8f),
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        // Desk Focus & Pomodoro Buddy Card
+                        item {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF161F33)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(16.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("Desk Focus & Pomodoro Buddy", color = Color(0xFF86E5FF), fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                        Surface(
+                                            color = when (robotState?.pomodoroState?.mode) {
+                                                PomodoroMode.FOCUS -> Color(0xFF1E3A5F)
+                                                PomodoroMode.SHORT_BREAK, PomodoroMode.LONG_BREAK -> Color(0xFF2E7D32)
+                                                else -> Color(0xFF26334D)
+                                            },
+                                            shape = RoundedCornerShape(12.dp)
+                                        ) {
+                                            Text(
+                                                if (robotState?.pomodoroState?.mode != PomodoroMode.INACTIVE)
+                                                    "${robotState?.pomodoroState?.formattedTime}"
+                                                else "Inactive",
+                                                color = Color.White,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "Keeps you on track with focused study eyes and mutes spontaneous chatter during focus blocks. Celebrates upon completion!",
+                                        color = Color.LightGray,
+                                        fontSize = 11.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("Completed Focus Sessions Today: ${robotState?.pomodoroState?.completedSessions ?: 0}", color = Color(0xFF9CFF9C), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Button(
+                                            onClick = { robotBrain?.send(RobotEvent.StartPomodoro(25)) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00ADB5)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("🎯 25m Focus", fontSize = 11.sp)
+                                        }
+
+                                        Button(
+                                            onClick = { robotBrain?.send(RobotEvent.StartBreak(5)) },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text("☕ 5m Break", fontSize = 11.sp)
+                                        }
+
+                                        if (robotState?.pomodoroState?.mode != PomodoroMode.INACTIVE) {
+                                            OutlinedButton(
+                                                onClick = { robotBrain?.send(RobotEvent.StopPomodoro) },
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                Text("Stop", fontSize = 11.sp, color = Color(0xFFFF8080))
+                                            }
                                         }
                                     }
                                 }

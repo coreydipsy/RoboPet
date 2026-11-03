@@ -53,6 +53,12 @@ class CameraPerception(context: Context) {
             gesturePerception.isEnabled = value
         }
 
+    var isRpsActive: Boolean
+        get() = gesturePerception.isRpsActive
+        set(value) {
+            gesturePerception.isRpsActive = value
+        }
+
     // High performance throttle mode (e.g. while speech or SLM thinking is active)
     var isHeavyComputeActive: Boolean = false
     var isSleeping: Boolean = false
@@ -128,8 +134,9 @@ class CameraPerception(context: Context) {
         }
 
         val runFace = (now - lastFaceAnalyzedMs >= FACE_INTERVAL_MS)
-        // Skip gestures during active speech/thinking or if gestures disabled
-        val runGesture = isGestureEnabled && !isHeavyComputeActive && (now - lastGestureAnalyzedMs >= GESTURE_INTERVAL_MS)
+        // During active RPS game, gestures take absolute priority and are NEVER skipped due to speaking!
+        val gestureInterval = if (isRpsActive) 140L else GESTURE_INTERVAL_MS
+        val runGesture = isGestureEnabled && (if (isRpsActive) (now - lastGestureAnalyzedMs >= gestureInterval) else (!isHeavyComputeActive && (now - lastGestureAnalyzedMs >= GESTURE_INTERVAL_MS)))
 
         if (!runFace && !runGesture) {
             imageProxy.close()
